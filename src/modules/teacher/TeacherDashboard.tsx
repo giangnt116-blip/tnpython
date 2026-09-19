@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { TeacherUser, DbExamResult, DbCodingProgress, LatestCodingProgress } from './types';
+import { TeacherUser, DbExamResult, DbCodingProgress, LatestCodingProgress, DbCodingSubmission } from './types';
 import {
   fetchExamResults,
   fetchCodingProgress,
+  fetchCodingSubmissions,
   deduplicateCodingProgress,
   buildStudentOverview,
 } from './teacherDataService';
@@ -10,6 +11,7 @@ import { signOutTeacher, getCurrentTeacher } from './teacherAuthService';
 import { basicCodingProblems } from '../../data/basicCodingProblems';
 import { septemberCodingProblems } from '../../data/septemberCodingProblems';
 import { TeacherStudentDetail } from './TeacherStudentDetail';
+import { SubmissionDetailModal } from './SubmissionDetailModal';
 import {
   LayoutDashboard,
   FileCheck2,
@@ -20,6 +22,8 @@ import {
   Users,
   Award,
   CheckCircle2,
+  XCircle,
+  AlertTriangle,
   BookOpen,
   ArrowUpDown,
   Filter,
@@ -31,6 +35,7 @@ import {
   ShieldCheck,
   Calendar,
   Sparkles,
+  Terminal,
 } from 'lucide-react';
 
 interface TeacherDashboardProps {
@@ -39,7 +44,7 @@ interface TeacherDashboardProps {
   onBackToHome: () => void;
 }
 
-type DashboardTab = 'overview' | 'exams' | 'coding';
+type DashboardTab = 'overview' | 'exams' | 'coding' | 'submissions';
 
 export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   teacher,
@@ -51,12 +56,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   // Raw data from Supabase
   const [examResults, setExamResults] = useState<DbExamResult[]>([]);
   const [rawCodingProgress, setRawCodingProgress] = useState<DbCodingProgress[]>([]);
+  const [codingSubmissions, setCodingSubmissions] = useState<DbCodingSubmission[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [dataError, setDataError] = useState<string | null>(null);
 
   // Selected exam row for detail modal
   const [selectedExamDetail, setSelectedExamDetail] = useState<DbExamResult | null>(null);
+
+  // Selected coding submission for modal
+  const [selectedSubmission, setSelectedSubmission] = useState<DbCodingSubmission | null>(null);
 
   // Filters for Exam Results
   const [examSearch, setExamSearch] = useState<string>('');
@@ -69,6 +78,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
   const [codingTrackFilter, setCodingTrackFilter] = useState<'all' | 'basic' | 'september'>('all');
   const [codingStatusFilter, setCodingStatusFilter] = useState<'all' | 'completed' | 'in_progress' | 'not_started'>('all');
   const [onlyLatestCoding, setOnlyLatestCoding] = useState<boolean>(true);
+
+  // Filters for Coding Submissions
+  const [subSearch, setSubSearch] = useState<string>('');
+  const [subClassFilter, setSubClassFilter] = useState<string>('all');
+  const [subProblemFilter, setSubProblemFilter] = useState<string>('all');
+  const [subVerdictFilter, setSubVerdictFilter] = useState<string>('all');
+  const [subTrackFilter, setSubTrackFilter] = useState<string>('all');
 
   // Filters for Overview Student List
   const [overviewSearch, setOverviewSearch] = useState<string>('');
@@ -113,13 +129,15 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
         return;
       }
 
-      const [exams, codings] = await Promise.all([
+      const [exams, codings, submissions] = await Promise.all([
         fetchExamResults(),
         fetchCodingProgress(),
+        fetchCodingSubmissions(),
       ]);
 
       setExamResults(exams);
       setRawCodingProgress(codings);
+      setCodingSubmissions(submissions);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Không thể tải dữ liệu từ máy chủ.';
       setDataError(msg);
@@ -147,10 +165,10 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     return deduplicateCodingProgress(rawCodingProgress);
   }, [rawCodingProgress]);
 
-  // Aggregate student overview data (Requirement 9)
+  // Aggregate student overview data (Requirement 9 + Submissions)
   const overviewData = useMemo(() => {
-    return buildStudentOverview(examResults, latestCodingProgress);
-  }, [examResults, latestCodingProgress]);
+    return buildStudentOverview(examResults, latestCodingProgress, codingSubmissions);
+  }, [examResults, latestCodingProgress, codingSubmissions]);
 
   // Classes list for dropdowns
   const availableClasses = useMemo(() => {
@@ -161,8 +179,67 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
     for (const c of rawCodingProgress) {
       if (c.class_name?.trim()) classSet.add(c.class_name.trim());
     }
+    for (const s of codingSubmissions) {
+      if (s.class_name?.trim()) classSet.add(s.class_name.trim());
+    }
     return Array.from(classSet).sort();
-  }, [examResults, rawCodingProgress]);
+  }, [examResults, rawCodingProgress, codingSubmissions]);
+
+  // Thống kê Submissions
+  const submissionStats = useMemo(() => {
+    const total = codingSubmissions.length;
+    const accepted = codingSubmissions.filter((s) => s.verdict === 'Accepted').length;
+    const wrongAnswer = codingSubmissions.filter((s) => s.verdict === 'Wrong Answer').length;
+    const acceptedRate = total > 0 ? Math.round((accepted / total) * 100) : 0;
+
+    // Nhận diện học sinh duy nhất bằng tổ hợp: student_name + class_name
+    const uniqueStudents = new Set(
+      codingSubmissions
+        .filter((s) => s.student_name && s.student_name.trim().length > 0)
+        .map((s) => `${s.student_name.trim().toLowerCase()}|||${(s.class_name ?? '').trim().toLowerCase()}`)
+    );
+    const studentSubmittedCount = uniqueStudents.size;
+
+    return {
+      total,
+      accepted,
+      wrongAnswer,
+      acceptedRate,
+      studentSubmittedCount,
+      uniqueStudents: studentSubmittedCount,
+    };
+  }, [codingSubmissions]);
+
+  // Danh sách Submissions đã lọc (Requirement 2, 3)
+  const filteredSubmissions = useMemo(() => {
+    let list = [...codingSubmissions];
+
+    if (subSearch.trim()) {
+      const q = subSearch.trim().toLowerCase();
+      list = list.filter((s) => s.student_name.toLowerCase().includes(q));
+    }
+
+    if (subClassFilter !== 'all') {
+      list = list.filter((s) => (s.class_name || '').trim() === subClassFilter);
+    }
+
+    if (subProblemFilter !== 'all') {
+      list = list.filter((s) => (s.problem_id || '').toUpperCase() === subProblemFilter.toUpperCase());
+    }
+
+    if (subVerdictFilter !== 'all') {
+      list = list.filter((s) => s.verdict === subVerdictFilter);
+    }
+
+    if (subTrackFilter !== 'all') {
+      list = list.filter((s) => s.track === subTrackFilter);
+    }
+
+    // Default sorting: submitted_at DESC
+    list.sort((a, b) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime());
+
+    return list;
+  }, [codingSubmissions, subSearch, subClassFilter, subProblemFilter, subVerdictFilter, subTrackFilter]);
 
   // Filtered Exam Results
   const filteredExamResults = useMemo(() => {
@@ -403,6 +480,25 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
               {onlyLatestCoding ? latestCodingProgress.length : rawCodingProgress.length}
             </span>
           </button>
+
+          <button
+            id="tab-teacher-submissions"
+            onClick={() => {
+              setSelectedStudent(null);
+              setActiveTab('submissions');
+            }}
+            className={`flex items-center gap-2 py-3 px-4 text-xs font-bold uppercase tracking-wider border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeTab === 'submissions' && !selectedStudent
+                ? 'text-blue-400 border-blue-500 bg-blue-500/5'
+                : 'text-slate-400 border-transparent hover:text-slate-200 hover:bg-slate-800/40'
+            }`}
+          >
+            <Terminal className="w-4 h-4" />
+            <span>BÀI NỘP LẬP TRÌNH</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 font-mono">
+              {codingSubmissions.length}
+            </span>
+          </button>
         </div>
       </header>
 
@@ -432,6 +528,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
             className={selectedStudent.className}
             examResults={examResults}
             rawCodingProgress={rawCodingProgress}
+            codingSubmissions={codingSubmissions}
             onBack={() => setSelectedStudent(null)}
           />
         ) : (
@@ -569,6 +666,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                           <th className="py-3.5 px-4">Cơ bản & Trung bình (33 bài)</th>
                           <th className="py-3.5 px-4">Luyện thi tháng 9 (33 bài)</th>
                           <th className="py-3.5 px-4 text-center">Tổng coding</th>
+                          <th className="py-3.5 px-4 text-center">Submissions (B01-B05)</th>
                           <th className="py-3.5 px-4 text-right">Hoạt động cuối</th>
                         </tr>
                       </thead>
@@ -654,6 +752,33 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                                     </span>
                                   </span>
                                 </td>
+                                <td className="py-3 px-4 text-center">
+                                  {s.totalSubmissions > 0 ? (
+                                    <div className="inline-flex flex-col items-center">
+                                      <div className="flex items-center gap-1.5 font-bold font-mono text-xs">
+                                        <span className="text-white">{s.totalSubmissions} nộp</span>
+                                        <span className="text-slate-500">•</span>
+                                        <span className="text-emerald-400">{s.acceptedSubmissions} AC</span>
+                                      </div>
+                                      <div className="flex items-center gap-1 mt-1 flex-wrap justify-center text-[10px] text-slate-400 font-mono">
+                                        {['B01', 'B02', 'B03', 'B04', 'B05'].map((pid) => {
+                                          const count = s.submissionsByProblem[pid] || 0;
+                                          if (count === 0) return null;
+                                          return (
+                                            <span
+                                              key={pid}
+                                              className="px-1 py-0.2 rounded bg-slate-800 border border-slate-700 text-slate-300"
+                                            >
+                                              {pid}: {count}
+                                            </span>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <span className="text-slate-500 text-[11px]">0 lượt nộp</span>
+                                  )}
+                                </td>
                                 <td className="py-3 px-4 text-right text-slate-400 text-[11px]">
                                   {formatDate(s.lastActiveAt)}
                                 </td>
@@ -662,7 +787,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                           })
                         ) : (
                           <tr>
-                            <td colSpan={7} className="py-8 text-center text-slate-500">
+                            <td colSpan={8} className="py-8 text-center text-slate-500">
                               Chưa có dữ liệu học sinh phù hợp với bộ lọc tìm kiếm.
                             </td>
                           </tr>
@@ -1016,9 +1141,385 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                 </div>
               </div>
             )}
+
+            {/* ========================================================= */}
+            {/* TAB 4: BÀI NỘP LẬP TRÌNH (Requirement 1, 2, 3, 4) */}
+            {/* ========================================================= */}
+            {activeTab === 'submissions' && (
+              <div className="space-y-6 animate-in fade-in duration-200">
+                {/* 1. Statistics Cards (Requirement 4) */}
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 sm:gap-4">
+                  {/* Card 1: Tổng số lượt nộp */}
+                  <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        TỔNG LƯỢT NỘP
+                      </span>
+                      <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center">
+                        <Terminal className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-white tracking-tight font-mono">
+                      {submissionStats.total}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Toàn bộ các lần submit code lên Judge
+                    </p>
+                  </div>
+
+                  {/* Card 2: Số lượt Accepted */}
+                  <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
+                        ACCEPTED
+                      </span>
+                      <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight font-mono">
+                      {submissionStats.accepted}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Số lần chấm đạt 100/100 điểm tuyệt đối
+                    </p>
+                  </div>
+
+                  {/* Card 3: Số lượt Wrong Answer */}
+                  <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-rose-400 uppercase tracking-wider">
+                        WRONG ANSWER
+                      </span>
+                      <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-400 flex items-center justify-center">
+                        <XCircle className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-rose-400 tracking-tight font-mono">
+                      {submissionStats.wrongAnswer}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Số lần chưa vượt qua tất cả các test
+                    </p>
+                  </div>
+
+                  {/* Card 4: Tỷ lệ Accepted */}
+                  <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-lg relative overflow-hidden">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        TỶ LỆ ACCEPTED
+                      </span>
+                      <div className="w-7 h-7 rounded-lg bg-indigo-500/10 text-indigo-400 flex items-center justify-center">
+                        <Award className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-indigo-400 tracking-tight font-mono">
+                      {submissionStats.acceptedRate}%
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      {submissionStats.total > 0
+                        ? `${submissionStats.accepted} / ${submissionStats.total} lượt chấm đạt`
+                        : 'Chưa có lượt nộp'}
+                    </p>
+                  </div>
+
+                  {/* Card 5: Số học sinh đã nộp code */}
+                  <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-4 shadow-lg relative overflow-hidden col-span-2 sm:col-span-1">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                        HỌC SINH ĐÃ NỘP
+                      </span>
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center">
+                        <Users className="w-3.5 h-3.5" />
+                      </div>
+                    </div>
+                    <div className="text-2xl sm:text-3xl font-black text-amber-400 tracking-tight font-mono">
+                      {submissionStats.studentSubmittedCount}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-1">
+                      Số học sinh khác nhau đã submit
+                    </p>
+                  </div>
+                </div>
+
+                {/* 2. Filter Bar & Submissions Table */}
+                <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl shadow-xl overflow-hidden">
+                  {/* Filter Toolbar */}
+                  <div className="p-4 sm:p-5 border-b border-slate-700/80 space-y-3">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                          <Terminal className="w-4 h-4 text-blue-400" />
+                          <span>Danh Sách Lượt Nộp Bài Lập Trình</span>
+                        </h2>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Dữ liệu chấm bài tự động qua Judge API (B01 - B05), hiển thị theo thời gian thực
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-mono text-slate-400 bg-slate-900/80 px-2.5 py-1 rounded-lg border border-slate-700">
+                          Hiển thị: <strong className="text-white">{filteredSubmissions.length}</strong> / {codingSubmissions.length} lượt nộp
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Filter controls row */}
+                    <div className="grid grid-cols-1 sm:grid-cols-5 gap-2.5 pt-1">
+                      {/* Search student */}
+                      <div className="relative">
+                        <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                        <input
+                          id="input-filter-sub-student"
+                          type="text"
+                          value={subSearch}
+                          onChange={(e) => setSubSearch(e.target.value)}
+                          placeholder="Tìm theo tên học sinh..."
+                          className="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-white placeholder:text-slate-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      {/* Filter Class */}
+                      <select
+                        id="select-filter-sub-class"
+                        value={subClassFilter}
+                        onChange={(e) => setSubClassFilter(e.target.value)}
+                        className="px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      >
+                        <option value="all">Tất cả lớp ({availableClasses.length})</option>
+                        {availableClasses.map((cls) => (
+                          <option key={cls} value={cls}>
+                            Lớp {cls}
+                          </option>
+                        ))}
+                      </select>
+
+                      {/* Filter Problem B01-B05 */}
+                      <select
+                        id="select-filter-sub-problem"
+                        value={subProblemFilter}
+                        onChange={(e) => setSubProblemFilter(e.target.value)}
+                        className="px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      >
+                        <option value="all">Tất cả bài (B01 - B05)</option>
+                        {['B01', 'B02', 'B03', 'B04', 'B05'].map((pid) => {
+                          const prob = septemberCodingProblems.find((p) => p.id === pid);
+                          return (
+                            <option key={pid} value={pid}>
+                              {pid} - {prob ? prob.title : ''}
+                            </option>
+                          );
+                        })}
+                      </select>
+
+                      {/* Filter Verdict */}
+                      <select
+                        id="select-filter-sub-verdict"
+                        value={subVerdictFilter}
+                        onChange={(e) => setSubVerdictFilter(e.target.value)}
+                        className="px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      >
+                        <option value="all">Tất cả kết quả (Verdict)</option>
+                        <option value="Accepted">Accepted</option>
+                        <option value="Wrong Answer">Wrong Answer</option>
+                        <option value="Compilation Error">Compilation Error</option>
+                        <option value="Runtime Error">Runtime Error</option>
+                        <option value="Time Limit Exceeded">Time Limit Exceeded</option>
+                      </select>
+
+                      {/* Filter Track */}
+                      <select
+                        id="select-filter-sub-track"
+                        value={subTrackFilter}
+                        onChange={(e) => setSubTrackFilter(e.target.value)}
+                        className="px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      >
+                        <option value="all">Tất cả Track</option>
+                        <option value="september">Luyện thi tháng 9</option>
+                        <option value="basic">Cơ bản & Trung bình</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Submissions Table (Requirement 2) */}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs text-slate-300">
+                      <thead className="bg-slate-900/60 text-slate-400 font-bold uppercase tracking-wider text-[11px] border-b border-slate-700/60">
+                        <tr>
+                          <th className="py-3.5 px-4">Học sinh</th>
+                          <th className="py-3.5 px-3">Lớp</th>
+                          <th className="py-3.5 px-4">Bài</th>
+                          <th className="py-3.5 px-3">Track</th>
+                          <th className="py-3.5 px-3">Ngôn ngữ</th>
+                          <th className="py-3.5 px-3 text-center">Điểm</th>
+                          <th className="py-3.5 px-3 text-center">Test đúng</th>
+                          <th className="py-3.5 px-3 text-center">Tổng test</th>
+                          <th className="py-3.5 px-3">Verdict</th>
+                          <th className="py-3.5 px-3">Thời gian</th>
+                          <th className="py-3.5 px-4 text-right">Thời điểm nộp</th>
+                          <th className="py-3.5 px-3 text-center">Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-700/40">
+                        {filteredSubmissions.length > 0 ? (
+                          filteredSubmissions.map((sub) => {
+                            const prob = septemberCodingProblems.find(
+                              (p) => p.id.toUpperCase() === (sub.problem_id || '').toUpperCase()
+                            );
+                            const probTitle = prob ? prob.title : '';
+
+                            return (
+                              <tr
+                                key={sub.id}
+                                onClick={() => setSelectedSubmission(sub)}
+                                className="hover:bg-slate-700/30 transition-colors cursor-pointer"
+                              >
+                                <td className="py-3 px-4">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedStudent({ studentName: sub.student_name, className: sub.class_name || '' });
+                                    }}
+                                    className="font-semibold text-white hover:text-blue-400 text-left flex items-center gap-1.5 group cursor-pointer transition-colors"
+                                    title={`Xem hồ sơ học sinh ${sub.student_name}`}
+                                  >
+                                    <span className="underline decoration-slate-600 underline-offset-2 group-hover:decoration-blue-400">
+                                      {sub.student_name}
+                                    </span>
+                                    <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 text-blue-400 transition-opacity shrink-0" />
+                                  </button>
+                                </td>
+                                <td className="py-3 px-3">
+                                  <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-300 font-mono text-[11px]">
+                                    {sub.class_name || '—'}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4">
+                                  <div className="flex items-baseline gap-2">
+                                    <span className="font-mono font-bold text-blue-300 text-xs px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700">
+                                      {sub.problem_id}
+                                    </span>
+                                    {probTitle && (
+                                      <span className="text-slate-300 text-xs truncate max-w-[160px]" title={probTitle}>
+                                        {probTitle}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="py-3 px-3">
+                                  <span className="text-slate-300 text-[11px]">
+                                    {sub.track === 'september' ? 'Luyện thi T9' : sub.track}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3">
+                                  <span className="font-mono text-emerald-400 text-[11px]">
+                                    {sub.language}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  <span
+                                    className={`font-mono font-bold text-xs px-2 py-0.5 rounded-full ${
+                                      sub.score === 100
+                                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                        : sub.score > 0
+                                        ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                        : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                                    }`}
+                                  >
+                                    {sub.score}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-3 text-center font-mono font-bold text-slate-200">
+                                  {sub.passed_tests}
+                                </td>
+                                <td className="py-3 px-3 text-center font-mono text-slate-400">
+                                  {sub.total_tests}
+                                </td>
+                                <td className="py-3 px-3">
+                                  {sub.verdict === 'Accepted' && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                      <CheckCircle2 className="w-3 h-3" />
+                                      Accepted
+                                    </span>
+                                  )}
+                                  {sub.verdict === 'Wrong Answer' && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                      <XCircle className="w-3 h-3" />
+                                      Wrong Answer
+                                    </span>
+                                  )}
+                                  {sub.verdict === 'Compilation Error' && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                      <AlertTriangle className="w-3 h-3" />
+                                      Compile Err
+                                    </span>
+                                  )}
+                                  {sub.verdict === 'Runtime Error' && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                                      <AlertTriangle className="w-3 h-3" />
+                                      Runtime Err
+                                    </span>
+                                  )}
+                                  {sub.verdict === 'Time Limit Exceeded' && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
+                                      <Clock className="w-3 h-3" />
+                                      TLE
+                                    </span>
+                                  )}
+                                  {!['Accepted', 'Wrong Answer', 'Compilation Error', 'Runtime Error', 'Time Limit Exceeded'].includes(sub.verdict) && (
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-700 text-slate-300">
+                                      {sub.verdict}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3 text-slate-400 font-mono text-[11px]">
+                                  {sub.execution_time_ms !== null && sub.execution_time_ms !== undefined
+                                    ? `${sub.execution_time_ms} ms`
+                                    : '—'}
+                                </td>
+                                <td className="py-3 px-4 text-right text-slate-400 font-mono text-[11px]">
+                                  {formatDate(sub.submitted_at)}
+                                </td>
+                                <td className="py-3 px-3 text-center">
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedSubmission(sub);
+                                    }}
+                                    className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 border border-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
+                                  >
+                                    Xem code
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={12} className="py-10 text-center text-slate-500">
+                              {codingSubmissions.length === 0
+                                ? 'Chưa có bài nộp lập trình.'
+                                : 'Không tìm thấy bài nộp lập trình nào phù hợp với bộ lọc.'}
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>
+
+      {/* Coding Submission Detail Modal */}
+      {selectedSubmission && (
+        <SubmissionDetailModal
+          submission={selectedSubmission}
+          onClose={() => setSelectedSubmission(null)}
+        />
+      )}
 
       {/* Exam Detail Modal (Breakdown by 10 topics) */}
       {selectedExamDetail && (

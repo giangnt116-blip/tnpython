@@ -51,7 +51,7 @@ export const PythonJudgeSection: React.FC<PythonJudgeSectionProps> = ({
   onUpdateStatus,
   onRequestStudentInfo,
 }) => {
-  const isSupported = track === 'september' && ['B01', 'B02'].includes(problemId);
+  const isSupported = track === 'september' && ['B01', 'B02', 'B03', 'B04', 'B05'].includes(problemId);
   const draftStorageKey = `python_submission_draft_${track}_${problemId}`;
 
   const [code, setCode] = useState<string>(() => {
@@ -210,7 +210,7 @@ export const PythonJudgeSection: React.FC<PythonJudgeSectionProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Hệ thống chấm tự động hiện đang được kích hoạt cho các bài <strong>B01</strong> và <strong>B02</strong>. Các bài tiếp theo (B03 - B33) sẽ được cập nhật bộ kiểm thử tự động trong thời gian tới.
+                Hệ thống chấm tự động hiện đang được kích hoạt cho các bài <strong>B01</strong> đến <strong>B05</strong>. Các bài tiếp theo (B06 - B33) sẽ được cập nhật bộ kiểm thử tự động trong thời gian tới.
               </p>
             </div>
           </div>

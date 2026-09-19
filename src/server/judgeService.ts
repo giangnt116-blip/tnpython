@@ -3,7 +3,7 @@ import { getSupabaseServerClient } from './supabaseServer';
 
 dotenv.config();
 
-export const SUPPORTED_PROBLEMS = ['B01', 'B02'] as const;
+export const SUPPORTED_PROBLEMS = ['B01', 'B02', 'B03', 'B04', 'B05'] as const;
 export type SupportedProblemId = (typeof SUPPORTED_PROBLEMS)[number];
 
 export interface JudgeRequestBody {

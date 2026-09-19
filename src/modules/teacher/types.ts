@@ -50,6 +50,22 @@ export interface LatestCodingProgress extends DbCodingProgress {
   dedupKey: string;
 }
 
+export interface DbCodingSubmission {
+  id: string | number;
+  student_name: string;
+  class_name: string | null;
+  track: string;
+  problem_id: string;
+  language: string;
+  source_code: string;
+  score: number;
+  passed_tests: number;
+  total_tests: number;
+  verdict: string;
+  execution_time_ms: number | null;
+  submitted_at: string;
+}
+
 export interface StudentOverviewSummary {
   studentName: string;
   className: string;
@@ -59,5 +75,8 @@ export interface StudentOverviewSummary {
   basicCompletedCount: number;
   septemberCompletedCount: number;
   totalCodingCompleted: number;
+  totalSubmissions: number;
+  acceptedSubmissions: number;
+  submissionsByProblem: Record<string, number>;
   lastActiveAt?: string;
 }

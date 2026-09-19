@@ -1,5 +1,11 @@
 import { supabase } from '../../lib/supabase';
-import { DbExamResult, DbCodingProgress, LatestCodingProgress, StudentOverviewSummary } from './types';
+import {
+  DbExamResult,
+  DbCodingProgress,
+  LatestCodingProgress,
+  DbCodingSubmission,
+  StudentOverviewSummary,
+} from './types';
 
 export async function fetchExamResults(): Promise<DbExamResult[]> {
   const { data, error } = await supabase
@@ -49,6 +55,33 @@ export async function fetchCodingProgress(): Promise<DbCodingProgress[]> {
   return (data || []) as DbCodingProgress[];
 }
 
+export async function fetchCodingSubmissions(): Promise<DbCodingSubmission[]> {
+  const { data, error } = await supabase
+    .from('coding_submissions')
+    .select(`
+      id,
+      student_name,
+      class_name,
+      track,
+      problem_id,
+      language,
+      source_code,
+      score,
+      passed_tests,
+      total_tests,
+      verdict,
+      execution_time_ms,
+      submitted_at
+    `)
+    .order('submitted_at', { ascending: false });
+
+  if (error) {
+    throw new Error(`Lỗi khi đọc danh sách bài nộp lập trình: ${error.message}`);
+  }
+
+  return (data || []) as DbCodingSubmission[];
+}
+
 /**
  * Deduplicate coding progress records.
  * Keeps only the latest record by `updated_at` for each (student_name, class_name, track, problem_id)
@@ -83,11 +116,12 @@ export function deduplicateCodingProgress(records: DbCodingProgress[]): LatestCo
 }
 
 /**
- * Aggregate summary across exam results and latest coding progress
+ * Aggregate summary across exam results, latest coding progress, and coding submissions
  */
 export function buildStudentOverview(
   examResults: DbExamResult[],
-  latestCoding: LatestCodingProgress[]
+  latestCoding: LatestCodingProgress[],
+  codingSubmissions: DbCodingSubmission[] = []
 ): {
   students: StudentOverviewSummary[];
   totalUniqueStudents: number;
@@ -114,6 +148,9 @@ export function buildStudentOverview(
         basicCompletedCount: 0,
         septemberCompletedCount: 0,
         totalCodingCompleted: 0,
+        totalSubmissions: 0,
+        acceptedSubmissions: 0,
+        submissionsByProblem: {},
       };
       studentMap.set(key, s);
     }
@@ -159,6 +196,24 @@ export function buildStudentOverview(
     const time = code.updated_at || code.completed_at || code.started_at;
     if (time && (!s.lastActiveAt || new Date(time) > new Date(s.lastActiveAt))) {
       s.lastActiveAt = time;
+    }
+  }
+
+  // 3. Process Coding Submissions
+  for (const sub of codingSubmissions) {
+    if (!sub.student_name) continue;
+    const s = getOrCreate(sub.student_name, sub.class_name);
+    s.totalSubmissions += 1;
+    if (sub.verdict === 'Accepted') {
+      s.acceptedSubmissions += 1;
+    }
+    const pid = (sub.problem_id || '').trim().toUpperCase();
+    if (pid) {
+      s.submissionsByProblem[pid] = (s.submissionsByProblem[pid] || 0) + 1;
+    }
+
+    if (sub.submitted_at && (!s.lastActiveAt || new Date(sub.submitted_at) > new Date(s.lastActiveAt))) {
+      s.lastActiveAt = sub.submitted_at;
     }
   }
 

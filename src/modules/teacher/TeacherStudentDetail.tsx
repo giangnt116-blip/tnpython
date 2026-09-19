@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { DbExamResult, DbCodingProgress } from './types';
+import { DbExamResult, DbCodingProgress, DbCodingSubmission } from './types';
+import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { basicCodingProblems } from '../../data/basicCodingProblems';
 import { septemberCodingProblems } from '../../data/septemberCodingProblems';
 import {
@@ -20,6 +21,10 @@ import {
   Info,
   Circle,
   Clock3,
+  Terminal,
+  XCircle,
+  AlertTriangle,
+  Check,
 } from 'lucide-react';
 
 interface TeacherStudentDetailProps {
@@ -27,22 +32,30 @@ interface TeacherStudentDetailProps {
   className: string;
   examResults: DbExamResult[];
   rawCodingProgress: DbCodingProgress[];
+  codingSubmissions?: DbCodingSubmission[];
   onBack: () => void;
 }
 
-type DetailTab = 'overview' | 'exams' | 'coding';
+type DetailTab = 'overview' | 'exams' | 'coding' | 'submissions';
 
 export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
   studentName,
   className,
   examResults,
   rawCodingProgress,
+  codingSubmissions = [],
   onBack,
 }) => {
   const [activeTab, setActiveTab] = useState<DetailTab>('overview');
 
   // Selected exam attempt for topic inspector
   const [selectedExamDetail, setSelectedExamDetail] = useState<DbExamResult | null>(null);
+
+  // Selected submission for code inspector modal
+  const [selectedSubmission, setSelectedSubmission] = useState<DbCodingSubmission | null>(null);
+
+  // Filter for submissions tab by problem
+  const [submissionProblemFilter, setSubmissionProblemFilter] = useState<string>('all');
 
   // Selected coding problem for inspect modal
   const [selectedProblemDetail, setSelectedProblemDetail] = useState<{
@@ -181,6 +194,63 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
     return `${m}p ${s < 10 ? '0' : ''}${s}s`;
   };
 
+  // 3b. Filter coding submissions for this student (Requirement 5)
+  const studentSubmissions = useMemo(() => {
+    if (!codingSubmissions || codingSubmissions.length === 0) return [];
+    const sName = studentName.trim().toLowerCase();
+    const cName = className.trim().toLowerCase();
+
+    return codingSubmissions
+      .filter((s) => {
+        const itemStudent = (s.student_name || '').trim().toLowerCase();
+        const itemClass = (s.class_name || '').trim().toLowerCase();
+        if (itemStudent !== sName) return false;
+        if (cName && itemClass && itemClass !== cName) return false;
+        return true;
+      })
+      .sort((a, b) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime());
+  }, [codingSubmissions, studentName, className]);
+
+  // Statistics for Problem B01 - B05 (Requirement 6)
+  const problemSummaries = useMemo(() => {
+    const problems = ['B01', 'B02', 'B03', 'B04', 'B05'];
+    return problems.map((pid) => {
+      const subs = studentSubmissions.filter(
+        (s) => (s.problem_id || '').trim().toUpperCase() === pid
+      );
+      const prob = septemberCodingProblems.find((p) => p.id.toUpperCase() === pid);
+      const title = prob ? prob.title : pid;
+      const totalAttempts = subs.length;
+      const isAccepted = subs.some((s) => s.verdict === 'Accepted');
+      const highestScore = totalAttempts > 0 ? Math.max(...subs.map((s) => s.score || 0)) : null;
+      const latestSub = subs[0] || null;
+
+      // Status in coding_progress (if available)
+      const rec = studentCodingMap.get(`september__${pid}`);
+      const progressStatus = rec?.status || (isAccepted ? 'completed' : totalAttempts > 0 ? 'in_progress' : 'not_started');
+
+      return {
+        id: pid,
+        title,
+        totalAttempts,
+        isAccepted,
+        highestScore,
+        latestScore: latestSub ? latestSub.score : null,
+        latestVerdict: latestSub ? latestSub.verdict : null,
+        latestSubmittedAt: latestSub ? latestSub.submitted_at : null,
+        progressStatus,
+      };
+    });
+  }, [studentSubmissions, studentCodingMap]);
+
+  // Filtered submissions list for the submissions tab table
+  const filteredStudentSubmissions = useMemo(() => {
+    if (submissionProblemFilter === 'all') return studentSubmissions;
+    return studentSubmissions.filter(
+      (s) => (s.problem_id || '').trim().toUpperCase() === submissionProblemFilter.toUpperCase()
+    );
+  }, [studentSubmissions, submissionProblemFilter]);
+
   // 4. Merge recent activities (Up to 10)
   interface RecentActivity {
     id: string;
@@ -188,7 +258,7 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
     timestamp: number;
     title: string;
     detail: string;
-    type: 'quiz' | 'coding';
+    type: 'quiz' | 'coding' | 'submission';
     status?: 'completed' | 'in_progress';
   }
 
@@ -207,6 +277,22 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
           title: `Làm quiz: ${exam.score}/100`,
           detail: `Đúng ${exam.correct_count}/40 câu • Sai ${exam.wrong_count} • Thời gian: ${formatDuration(exam.duration_seconds)}`,
           type: 'quiz',
+        });
+      }
+    }
+
+    // Add coding submissions (Judge)
+    for (const sub of studentSubmissions) {
+      const time = sub.submitted_at;
+      if (time) {
+        const d = new Date(time);
+        list.push({
+          id: `sub_${sub.id}`,
+          timeStr: formatDate(time),
+          timestamp: d.getTime(),
+          title: `Nộp bài ${sub.problem_id}: ${sub.verdict} (${sub.score}/100)`,
+          detail: `Đúng ${sub.passed_tests}/${sub.total_tests} test • Ngôn ngữ: ${sub.language} • ${sub.execution_time_ms !== null && sub.execution_time_ms !== undefined ? `${sub.execution_time_ms} ms` : ''}`,
+          type: 'submission',
         });
       }
     }
@@ -236,7 +322,7 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
     // Sort newest first and limit to 10
     list.sort((a, b) => b.timestamp - a.timestamp);
     return list.slice(0, 10);
-  }, [studentExams, studentCodingMap, problemTitles]);
+  }, [studentExams, studentSubmissions, studentCodingMap, problemTitles]);
 
   return (
     <div className="space-y-6">
@@ -305,6 +391,20 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
             <span>TIẾN ĐỘ CODING</span>
             <span className="px-1.5 py-0.2 rounded-full bg-slate-900/60 text-[10px] font-mono">
               {basicCompletedCount + septemberCompletedCount}/66
+            </span>
+          </button>
+          <button
+            id="tab-detail-submissions"
+            onClick={() => setActiveTab('submissions')}
+            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === 'submissions'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <span>BÀI NỘP</span>
+            <span className="px-1.5 py-0.2 rounded-full bg-slate-900/60 text-[10px] font-mono">
+              {studentSubmissions.length}
             </span>
           </button>
         </div>
@@ -585,6 +685,8 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
                         className={`px-1.5 py-0.2 rounded font-bold uppercase text-[9px] ${
                           act.type === 'quiz'
                             ? 'bg-indigo-500/20 text-indigo-300 border border-indigo-500/30'
+                            : act.type === 'submission'
+                            ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                             : act.status === 'completed'
                             ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                             : 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
@@ -592,6 +694,8 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
                       >
                         {act.type === 'quiz'
                           ? 'Trắc nghiệm'
+                          : act.type === 'submission'
+                          ? 'Judge Nộp bài'
                           : act.status === 'completed'
                           ? 'Hoàn thành'
                           : 'Đang làm'}
@@ -958,6 +1062,299 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
       )}
 
       {/* ========================================================= */}
+      {/* TAB 4: BÀI NỘP LẬP TRÌNH (Requirement 5, 6, 7, 11) */}
+      {/* ========================================================= */}
+      {activeTab === 'submissions' && (
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Header & Quick stats */}
+          <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl p-5 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-700/80">
+              <div>
+                <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  <Terminal className="w-5 h-5 text-blue-400" />
+                  <span>Lịch Sử Bài Nộp Lập Trình (Judge B01 - B05)</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Chi tiết từng bài B01-B05 và lịch sử tất cả các lần nộp code của học sinh{' '}
+                  <strong className="text-white">{studentName}</strong>
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-mono px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-700 text-slate-300">
+                  Tổng số bài nộp: <strong className="text-white">{studentSubmissions.length}</strong>
+                </span>
+                <span className="text-xs font-mono px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+                  Accepted: <strong className="text-emerald-400">
+                    {studentSubmissions.filter((s) => s.verdict === 'Accepted').length}
+                  </strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Requirement 6: Chi tiết bài nộp theo bài (B01 - B05 Cards) */}
+            <div className="pt-4">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
+                <span>Trạng thái 5 bài đã mở Judge tự động (B01 - B05)</span>
+              </h4>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+                {problemSummaries.map((ps) => {
+                  const cardBg = ps.isAccepted
+                    ? 'border-emerald-500/40 bg-emerald-500/5'
+                    : ps.totalAttempts > 0
+                    ? 'border-blue-500/40 bg-blue-500/5'
+                    : 'border-slate-700/60 bg-slate-900/40';
+
+                  return (
+                    <div
+                      key={ps.id}
+                      onClick={() => setSubmissionProblemFilter(ps.id)}
+                      className={`p-4 rounded-xl border transition-all cursor-pointer hover:scale-[1.01] ${cardBg}`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-mono font-bold text-sm text-white px-2 py-0.5 rounded bg-slate-900 border border-slate-700">
+                          {ps.id}
+                        </span>
+                        {ps.isAccepted ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Accepted
+                          </span>
+                        ) : ps.totalAttempts > 0 ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            <Clock className="w-3 h-3" />
+                            Đang làm
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400">
+                            Chưa nộp
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="text-xs font-semibold text-slate-200 truncate mb-3" title={ps.title}>
+                        {ps.title}
+                      </div>
+
+                      <div className="space-y-1.5 text-[11px] border-t border-slate-700/40 pt-2 font-mono">
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>Số lần nộp:</span>
+                          <span className="font-bold text-white">{ps.totalAttempts} lần</span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>Điểm cao nhất:</span>
+                          <span className={`font-bold ${ps.highestScore === 100 ? 'text-emerald-400' : 'text-white'}`}>
+                            {ps.highestScore !== null ? `${ps.highestScore} đ` : '—'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>Gần nhất:</span>
+                          <span
+                            className={`font-semibold truncate max-w-[110px] ${
+                              ps.latestVerdict === 'Accepted'
+                                ? 'text-emerald-400'
+                                : ps.latestVerdict
+                                ? 'text-rose-400'
+                                : 'text-slate-500'
+                            }`}
+                            title={ps.latestVerdict || 'Chưa nộp'}
+                          >
+                            {ps.latestVerdict ? `${ps.latestVerdict} (${ps.latestScore}đ)` : '—'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-slate-400">
+                          <span>Trạng thái:</span>
+                          <span className="text-slate-200 font-sans text-[10px]">
+                            {ps.isAccepted
+                              ? 'Đã hoàn thành'
+                              : ps.totalAttempts > 0
+                              ? 'Đang làm'
+                              : 'Chưa làm'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Requirement 7: Lịch sử tất cả lần nộp của học sinh đó */}
+          <div className="bg-slate-800/90 border border-slate-700/80 rounded-2xl shadow-xl overflow-hidden">
+            <div className="p-4 sm:p-5 border-b border-slate-700/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h3 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+                  <Terminal className="w-4 h-4 text-blue-400" />
+                  <span>Danh Sách Toàn Bộ Lần Nộp Code</span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Sắp xếp mới nhất trước. Bấm "Xem code" để xem mã nguồn đã nộp.
+                </p>
+              </div>
+
+              {/* Problem filter dropdown */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400">Lọc bài:</span>
+                <select
+                  id="select-filter-student-detail-problem"
+                  value={submissionProblemFilter}
+                  onChange={(e) => setSubmissionProblemFilter(e.target.value)}
+                  className="px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                >
+                  <option value="all">Tất cả bài ({studentSubmissions.length})</option>
+                  {['B01', 'B02', 'B03', 'B04', 'B05'].map((pid) => (
+                    <option key={pid} value={pid}>
+                      {pid}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Submissions Table / Empty State (Requirement 11) */}
+            {filteredStudentSubmissions.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-slate-300">
+                  <thead className="bg-slate-900/60 text-slate-400 font-bold uppercase tracking-wider text-[11px] border-b border-slate-700/60">
+                    <tr>
+                      <th className="py-3.5 px-4">Bài</th>
+                      <th className="py-3.5 px-3">Track</th>
+                      <th className="py-3.5 px-3">Ngôn ngữ</th>
+                      <th className="py-3.5 px-3 text-center">Điểm</th>
+                      <th className="py-3.5 px-3 text-center">Passed / Total</th>
+                      <th className="py-3.5 px-3">Verdict</th>
+                      <th className="py-3.5 px-3">Thời gian</th>
+                      <th className="py-3.5 px-4 text-right">Thời điểm nộp</th>
+                      <th className="py-3.5 px-3 text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-700/40">
+                    {filteredStudentSubmissions.map((sub) => {
+                      const prob = septemberCodingProblems.find(
+                        (p) => p.id.toUpperCase() === (sub.problem_id || '').toUpperCase()
+                      );
+                      const probTitle = prob ? prob.title : '';
+
+                      return (
+                        <tr
+                          key={sub.id}
+                          onClick={() => setSelectedSubmission(sub)}
+                          className="hover:bg-slate-700/30 transition-colors cursor-pointer"
+                        >
+                          <td className="py-3 px-4">
+                            <div className="flex items-baseline gap-2">
+                              <span className="font-mono font-bold text-blue-300 text-xs px-1.5 py-0.5 rounded bg-slate-900 border border-slate-700">
+                                {sub.problem_id}
+                              </span>
+                              {probTitle && (
+                                <span className="text-slate-300 text-xs truncate max-w-[180px]" title={probTitle}>
+                                  {probTitle}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="text-slate-300 text-[11px]">
+                              {sub.track === 'september' ? 'Luyện thi T9' : sub.track}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-mono text-emerald-400 text-[11px]">
+                              {sub.language}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span
+                              className={`font-mono font-bold text-xs px-2 py-0.5 rounded-full ${
+                                sub.score === 100
+                                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                                  : sub.score > 0
+                                  ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
+                                  : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              }`}
+                            >
+                              {sub.score}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-200">
+                            {sub.passed_tests} / {sub.total_tests}
+                          </td>
+                          <td className="py-3 px-3">
+                            {sub.verdict === 'Accepted' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                <CheckCircle2 className="w-3 h-3" />
+                                Accepted
+                              </span>
+                            )}
+                            {sub.verdict === 'Wrong Answer' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                                <XCircle className="w-3 h-3" />
+                                Wrong Answer
+                              </span>
+                            )}
+                            {sub.verdict === 'Compilation Error' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                                <AlertTriangle className="w-3 h-3" />
+                                Compile Err
+                              </span>
+                            )}
+                            {sub.verdict === 'Runtime Error' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-orange-500/20 text-orange-300 border border-orange-500/30">
+                                <AlertTriangle className="w-3 h-3" />
+                                Runtime Err
+                              </span>
+                            )}
+                            {sub.verdict === 'Time Limit Exceeded' && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
+                                <Clock className="w-3 h-3" />
+                                TLE
+                              </span>
+                            )}
+                            {!['Accepted', 'Wrong Answer', 'Compilation Error', 'Runtime Error', 'Time Limit Exceeded'].includes(sub.verdict) && (
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-slate-700 text-slate-300">
+                                {sub.verdict}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3 text-slate-400 font-mono text-[11px]">
+                            {sub.execution_time_ms !== null && sub.execution_time_ms !== undefined
+                              ? `${sub.execution_time_ms} ms`
+                              : '—'}
+                          </td>
+                          <td className="py-3 px-4 text-right text-slate-400 font-mono text-[11px]">
+                            {formatDate(sub.submitted_at)}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedSubmission(sub);
+                              }}
+                              className="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-blue-400 hover:text-blue-300 border border-slate-700 text-[11px] font-semibold transition-colors cursor-pointer"
+                            >
+                              Xem code
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="py-12 text-center text-slate-500 text-xs">
+                {studentSubmissions.length === 0
+                  ? 'Chưa có bài nộp lập trình.'
+                  : `Học sinh chưa có bài nộp nào cho bài ${submissionProblemFilter}.`}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================= */}
       {/* MODAL: CHI TIẾT 10 CHỦ ĐỀ QUIZ */}
       {/* ========================================================= */}
       {selectedExamDetail && (
@@ -1164,6 +1561,16 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
             </div>
           </div>
         </div>
+      )}
+
+      {/* ========================================================= */}
+      {/* MODAL: CHI TIẾT BÀI NỘP (Requirement 8) */}
+      {/* ========================================================= */}
+      {selectedSubmission && (
+        <SubmissionDetailModal
+          submission={selectedSubmission}
+          onClose={() => setSelectedSubmission(null)}
+        />
       )}
     </div>
   );
