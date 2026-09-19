@@ -6,6 +6,7 @@
 import React, { useState, useMemo } from 'react';
 import { CodingProblem, ProblemStatus } from '../../types';
 import { ProblemCard } from './ProblemCard';
+import { Footer } from '../../components/Footer';
 import {
   Search,
   Filter,
@@ -325,6 +326,9 @@ export const ProblemListView: React.FC<ProblemListViewProps> = ({
           </div>
         )}
       </main>
+
+      {/* Footer toàn hệ thống */}
+      <Footer theme="light" />
     </div>
   );
 };

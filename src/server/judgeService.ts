@@ -1,10 +1,11 @@
 import dotenv from 'dotenv';
 import { getSupabaseServerClient } from './supabaseServer';
+import { JUDGE_ENABLED_PROBLEMS, JudgeEnabledProblemId } from '../config/judgeConfig';
 
 dotenv.config();
 
-export const SUPPORTED_PROBLEMS = ['B01', 'B02', 'B03', 'B04', 'B05'] as const;
-export type SupportedProblemId = (typeof SUPPORTED_PROBLEMS)[number];
+export const SUPPORTED_PROBLEMS = JUDGE_ENABLED_PROBLEMS;
+export type SupportedProblemId = JudgeEnabledProblemId;
 
 export interface JudgeRequestBody {
   student_name: string;

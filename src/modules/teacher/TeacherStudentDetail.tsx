@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { DbExamResult, DbCodingProgress, DbCodingSubmission } from './types';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
+import { Footer } from '../../components/Footer';
 import { basicCodingProblems } from '../../data/basicCodingProblems';
 import { septemberCodingProblems } from '../../data/septemberCodingProblems';
 import {
@@ -1474,6 +1475,9 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
           </div>
         </div>
       )}
+
+      {/* Footer toàn hệ thống */}
+      <Footer theme="dark" className="mt-8 border-t border-slate-800" />
 
       {/* ========================================================= */}
       {/* MODAL: CHI TIẾT TRẠNG THÁI BÀI CODING */}

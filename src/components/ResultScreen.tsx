@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ExamResult } from '../types';
+import { Footer } from './Footer';
 import {
   Award,
   CheckCircle2,
@@ -65,8 +66,8 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({ result, isSynced = t
   };
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-3.5 sm:p-6">
-      <div className="w-full max-w-2xl bg-slate-800/90 border border-slate-700/80 rounded-3xl p-5 sm:p-9 shadow-2xl backdrop-blur-xs">
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center justify-between p-3.5 sm:p-6">
+      <div className="w-full max-w-2xl bg-slate-800/90 border border-slate-700/80 rounded-3xl p-5 sm:p-9 shadow-2xl backdrop-blur-xs my-auto">
         {/* Title */}
         <div className="text-center space-y-2 mb-7">
           <div className="inline-flex items-center justify-center w-13 h-13 sm:w-14 sm:h-14 rounded-2xl bg-sky-500/10 border border-sky-500/20 text-sky-400 mb-1">
@@ -299,6 +300,8 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({ result, isSynced = t
           </div>
         )}
       </div>
+
+      <Footer theme="dark" className="mt-8 max-w-2xl rounded-2xl border border-slate-800/80" />
     </div>
   );
 };

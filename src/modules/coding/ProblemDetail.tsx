@@ -7,6 +7,7 @@ import React, { useState } from 'react';
 import { CodingProblem, ProblemStatus } from '../../types';
 import { CodingStudentInfo } from '../../utils/codingStorage';
 import { PythonJudgeSection } from './PythonJudgeSection';
+import { Footer } from '../../components/Footer';
 import {
   ArrowLeft,
   Copy,
@@ -443,6 +444,9 @@ export const ProblemDetail: React.FC<ProblemDetailProps> = ({
           </div>
         </div>
       </main>
+
+      {/* Footer toàn hệ thống */}
+      <Footer theme="light" />
 
       {/* Confirmation Modal for Marking Completed */}
       {showCompleteConfirm && (

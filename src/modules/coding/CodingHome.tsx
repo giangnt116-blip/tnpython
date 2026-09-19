@@ -10,6 +10,7 @@ import { CodingProblem, ProblemStatus } from '../../types';
 import { saveCodingProgress } from '../../services/codingProgress';
 import { ProblemDetail } from './ProblemDetail';
 import { ProblemListView } from './ProblemListView';
+import { Footer } from '../../components/Footer';
 import {
   getGroupProblemStatuses,
   setGroupProblemStatus,
@@ -591,6 +592,9 @@ export const CodingHome: React.FC<CodingHomeProps> = ({ onBackToHome }) => {
           </div>
         </div>
       </main>
+
+      {/* Footer toàn hệ thống */}
+      <Footer theme="light" />
 
       {/* Student Info Modal */}
       {showStudentModal && (

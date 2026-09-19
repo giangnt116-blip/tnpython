@@ -6,6 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProblemStatus } from '../../types';
 import { CodingStudentInfo } from '../../utils/codingStorage';
+import { isJudgeEnabled, JUDGE_ENABLED_PROBLEMS } from '../../config/judgeConfig';
 import {
   Play,
   Trash2,

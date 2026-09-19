@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { StudentInfo } from '../types';
+import { Footer } from './Footer';
 import { Award, Clock, FileQuestion, User, Users, ArrowRight } from 'lucide-react';
 
 interface StartScreenProps {
@@ -27,7 +28,7 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart, onBack }) => 
   const isNameEmpty = touched && !fullName.trim();
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4 sm:p-6 relative">
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center justify-between p-4 sm:p-6 relative">
       {onBack && (
         <button
           id="btn-back-home"
@@ -136,6 +137,8 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart, onBack }) => 
           </button>
         </form>
       </div>
+
+      <Footer theme="dark" className="mt-8 max-w-lg rounded-2xl border border-slate-800/80" />
     </div>
   );
 };

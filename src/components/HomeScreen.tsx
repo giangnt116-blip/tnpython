@@ -4,6 +4,7 @@
  */
 
 import React from 'react';
+import { Footer } from './Footer';
 import {
   FileQuestion,
   Code2,
@@ -226,18 +227,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-slate-800/80 py-6 text-center text-xs text-slate-500 flex flex-col items-center justify-center gap-2">
-        <p>Hệ thống Giáo dục & Khảo thí Trực tuyến • Python & C++ Programming</p>
-        <button
-          id="btn-footer-teacher-portal"
-          onClick={onSelectTeacher}
-          className="text-[11px] text-slate-500 hover:text-blue-400 transition-colors cursor-pointer inline-flex items-center gap-1.5"
-        >
-          <Shield className="w-3 h-3" />
-          <span>Cổng Quản Trị Giáo Viên (Teacher Portal)</span>
-        </button>
-      </footer>
+      {/* Footer toàn hệ thống */}
+      <Footer
+        theme="dark"
+        className="relative z-10"
+        extraLink={
+          <button
+            id="btn-footer-teacher-portal"
+            onClick={onSelectTeacher}
+            className="text-[11px] text-slate-400 hover:text-blue-400 transition-colors cursor-pointer inline-flex items-center gap-1.5"
+          >
+            <Shield className="w-3 h-3" />
+            <span>Cổng Quản Trị Giáo Viên (Teacher Portal)</span>
+          </button>
+        }
+      />
     </div>
   );
 };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { signInTeacher } from './teacherAuthService';
 import { TeacherUser } from './types';
+import { Footer } from '../../components/Footer';
 import { Shield, Lock, Mail, ArrowLeft, AlertCircle, Loader2 } from 'lucide-react';
 
 interface TeacherLoginProps {
@@ -168,10 +169,8 @@ export const TeacherLogin: React.FC<TeacherLoginProps> = ({
         </div>
       </main>
 
-      {/* Footer */}
-      <footer className="relative z-10 border-t border-slate-800/80 py-4 text-center text-xs text-slate-500">
-        PYTHON 100 CHALLENGE • Quản trị dữ liệu & Tiến độ học tập
-      </footer>
+      {/* Footer toàn hệ thống */}
+      <Footer theme="dark" className="relative z-10" />
     </div>
   );
 };

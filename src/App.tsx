@@ -7,6 +7,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { questions } from './data/questions.js';
 import { StudentInfo, ExamResult, Question, CategoryScore, SavedExamState } from './types';
 import { StartScreen } from './components/StartScreen';
+import { Footer } from './components/Footer';
 import { ExamHeader } from './components/ExamHeader';
 import { QuestionCard } from './components/QuestionCard';
 import { QuestionNavigator } from './components/QuestionNavigator';
@@ -583,6 +584,9 @@ export default function App() {
           onCloseMobile={() => setIsOpenMobileNavigator(false)}
         />
       </main>
+
+      {/* Footer toàn hệ thống */}
+      <Footer theme="light" />
 
       {/* Submit Confirmation Modal */}
       <SubmitConfirmModal

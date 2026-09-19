@@ -12,6 +12,7 @@ import { basicCodingProblems } from '../../data/basicCodingProblems';
 import { septemberCodingProblems } from '../../data/septemberCodingProblems';
 import { TeacherStudentDetail } from './TeacherStudentDetail';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
+import { Footer } from '../../components/Footer';
 import {
   LayoutDashboard,
   FileCheck2,
@@ -1512,6 +1513,9 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
           </>
         )}
       </main>
+
+      {/* Footer toàn hệ thống */}
+      <Footer theme="dark" className="border-t border-slate-800" />
 
       {/* Coding Submission Detail Modal */}
       {selectedSubmission && (
