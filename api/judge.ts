@@ -1,4 +1,4 @@
-import { executeJudgeB01 } from '../src/server/judgeService';
+import { executeJudge } from '../src/server/judgeService';
 
 /**
  * Vercel Serverless Function endpoint: /api/judge
@@ -32,7 +32,7 @@ export default async function handler(req: any, res: any) {
       }
     }
 
-    const result = await executeJudgeB01(body);
+    const result = await executeJudge(body);
     return res.status(result.status).json(result.data);
   } catch (err: any) {
     console.error('[Vercel Serverless /api/judge] Unhandled exception:', err);

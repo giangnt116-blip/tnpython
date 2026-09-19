@@ -4,6 +4,7 @@ import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { Footer } from '../../components/Footer';
 import { basicCodingProblems } from '../../data/basicCodingProblems';
 import { septemberCodingProblems } from '../../data/septemberCodingProblems';
+import { JUDGE_ENABLED_PROBLEMS } from '../../config/judgeConfig';
 import {
   ArrowLeft,
   Award,
@@ -212,9 +213,9 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
       .sort((a, b) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime());
   }, [codingSubmissions, studentName, className]);
 
-  // Statistics for Problem B01 - B05 (Requirement 6)
+  // Statistics for Problem B01 - B10
   const problemSummaries = useMemo(() => {
-    const problems = ['B01', 'B02', 'B03', 'B04', 'B05'];
+    const problems = JUDGE_ENABLED_PROBLEMS as readonly string[];
     return problems.map((pid) => {
       const subs = studentSubmissions.filter(
         (s) => (s.problem_id || '').trim().toUpperCase() === pid
@@ -1073,10 +1074,10 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
               <div>
                 <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                   <Terminal className="w-5 h-5 text-blue-400" />
-                  <span>Lịch Sử Bài Nộp Lập Trình (Judge B01 - B05)</span>
+                  <span>Lịch Sử Bài Nộp Lập Trình (Judge B01 - B10)</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Chi tiết từng bài B01-B05 và lịch sử tất cả các lần nộp code của học sinh{' '}
+                  Chi tiết từng bài B01-B10 và lịch sử tất cả các lần nộp code của học sinh{' '}
                   <strong className="text-white">{studentName}</strong>
                 </p>
               </div>
@@ -1093,10 +1094,10 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
               </div>
             </div>
 
-            {/* Requirement 6: Chi tiết bài nộp theo bài (B01 - B05 Cards) */}
+            {/* Requirement 6: Chi tiết bài nộp theo bài (B01 - B10 Cards) */}
             <div className="pt-4">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-                <span>Trạng thái 5 bài đã mở Judge tự động (B01 - B05)</span>
+                <span>Trạng thái 10 bài đã mở Judge tự động (B01 - B10)</span>
               </h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -1205,7 +1206,7 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
                   className="px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
                 >
                   <option value="all">Tất cả bài ({studentSubmissions.length})</option>
-                  {['B01', 'B02', 'B03', 'B04', 'B05'].map((pid) => (
+                  {(JUDGE_ENABLED_PROBLEMS as readonly string[]).map((pid) => (
                     <option key={pid} value={pid}>
                       {pid}
                     </option>

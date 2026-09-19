@@ -7,6 +7,12 @@ function judgeDevApiPlugin() {
   return {
     name: 'judge-dev-api',
     configureServer(server: any) {
+      server.middlewares.use('/api/health', (req: any, res: any) => {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
+      });
+
       server.middlewares.use('/api/judge', async (req: any, res: any) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
@@ -56,6 +62,9 @@ export default defineConfig(() => {
       },
     },
     server: {
+      host: '0.0.0.0',
+      port: 3000,
+      allowedHosts: true as const,
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       hmr: process.env.DISABLE_HMR !== 'true',
       watch: process.env.DISABLE_HMR === 'true' ? null : {},

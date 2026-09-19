@@ -151,7 +151,7 @@ export async function executeJudge(
   }
 
   // 4. Configure Judge0 API (Judge0 CE direct instance)
-  const rawJudge0Url = process.env.JUDGE0_URL || 'https://ce.judge0.com';
+  const rawJudge0Url = process.env.JUDGE0_URL?.trim() || 'https://ce.judge0.com';
   const judge0Url = rawJudge0Url.replace(/\/+$/, '');
 
   // Default request headers for Judge0 CE
@@ -159,12 +159,12 @@ export async function executeJudge(
     'Content-Type': 'application/json',
   };
 
-  // RapidAPI headers are strictly optional - only attach if variables exist
-  if (process.env.JUDGE0_API_KEY) {
-    judge0Headers['X-RapidAPI-Key'] = process.env.JUDGE0_API_KEY;
-  }
-  if (process.env.JUDGE0_API_HOST) {
-    judge0Headers['X-RapidAPI-Host'] = process.env.JUDGE0_API_HOST;
+  // RapidAPI headers are strictly optional - only attach if both key and host exist and are non-empty
+  const apiKey = process.env.JUDGE0_API_KEY?.trim();
+  const apiHost = process.env.JUDGE0_API_HOST?.trim();
+  if (apiKey && apiHost) {
+    judge0Headers['X-RapidAPI-Key'] = apiKey;
+    judge0Headers['X-RapidAPI-Host'] = apiHost;
   }
 
   // 5. Submit Batch to Judge0
