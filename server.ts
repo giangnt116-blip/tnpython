@@ -36,7 +36,7 @@ async function startServer() {
       return res.status(result.status).json(result.data);
     } catch (err: any) {
       console.error('[Server /api/judge] Internal server error:', err);
-      return res.status(500).json({ error: 'Lỗi máy chủ nội bộ.' });
+      return res.status(500).json({ error: 'Không thể chấm bài lúc này. Vui lòng thử lại.' });
     }
   });
 

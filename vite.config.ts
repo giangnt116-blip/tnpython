@@ -38,9 +38,10 @@ function judgeDevApiPlugin() {
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify(result.data));
             } catch (err: any) {
+              console.error('[Vite dev /api/judge] Error:', err);
               res.statusCode = 500;
               res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ error: err?.message || 'Lỗi máy chủ nội bộ.' }));
+              res.end(JSON.stringify({ error: 'Không thể chấm bài lúc này. Vui lòng thử lại.' }));
             }
           });
         } else {

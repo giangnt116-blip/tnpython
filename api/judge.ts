@@ -104,11 +104,31 @@ export function validateJudgeRequest(body: any): string | null {
     return 'Tên học sinh (student_name) không được để trống.';
   }
 
+  if (student_name.trim().length > 100) {
+    return 'Tên học sinh không được vượt quá 100 ký tự.';
+  }
+
+  if (body.class_name !== undefined && body.class_name !== null) {
+    if (typeof body.class_name !== 'string') {
+      return 'Tên lớp (class_name) không hợp lệ.';
+    }
+    if (body.class_name.trim().length > 50) {
+      return 'Tên lớp không được vượt quá 50 ký tự.';
+    }
+  }
+
   if (
     typeof problem_id !== 'string' ||
-    !isValidJudgeProblem(problem_id)
+    !problem_id.trim() ||
+    !isValidJudgeProblem(problem_id.trim().toUpperCase())
   ) {
     return `Hệ thống hiện chỉ hỗ trợ chấm các bài: ${JUDGE_ENABLED_PROBLEMS.join(', ')}.`;
+  }
+
+  if (body.language !== undefined && body.language !== null) {
+    if (typeof body.language !== 'string' || body.language.trim().toLowerCase() !== 'python') {
+      return 'Hệ thống hiện chỉ hỗ trợ ngôn ngữ lập trình Python (language: python).';
+    }
   }
 
   if (typeof source_code !== 'string' || source_code.trim().length === 0) {
@@ -233,7 +253,7 @@ export async function executeJudge(
       console.error(`[Judge API] Judge0 batch submit failed: status ${submitRes.status}`, errText);
       return {
         status: 502,
-        data: { error: 'Lỗi máy chủ chấm code (Judge0 submit failed).' },
+        data: { error: 'Không thể chấm bài lúc này. Vui lòng thử lại.' },
       };
     }
 
@@ -248,14 +268,14 @@ export async function executeJudge(
       console.error(`[Judge API] Received ${tokens.length} tokens, expected ${tests.length}`);
       return {
         status: 502,
-        data: { error: 'Hệ thống Judge0 không trả về đủ mã bài nộp cho các test case.' },
+        data: { error: 'Không thể chấm bài lúc này. Vui lòng thử lại.' },
       };
     }
   } catch (err) {
     console.error('[Judge API] Network error during Judge0 submission:', err);
     return {
       status: 502,
-      data: { error: 'Không thể kết nối đến máy chủ chấm Judge0.' },
+      data: { error: 'Không thể chấm bài lúc này. Vui lòng thử lại.' },
     };
   }
 
@@ -308,14 +328,15 @@ export async function executeJudge(
     console.error('[Judge API] Polling error:', err);
     return {
       status: 502,
-      data: { error: 'Lỗi trong quá trình chờ kết quả từ Judge0.' },
+      data: { error: 'Không thể chấm bài lúc này. Vui lòng thử lại.' },
     };
   }
 
   if (!finalSubmissions || finalSubmissions.length === 0) {
+    console.error('[Judge API] Timeout: No submissions finished within max polling duration');
     return {
       status: 502,
-      data: { error: 'Không nhận được kết quả chấm từ máy chủ Judge0 sau thời gian chờ.' },
+      data: { error: 'Không thể chấm bài lúc này. Vui lòng thử lại.' },
     };
   }
 
@@ -498,6 +519,6 @@ export default async function handler(req: any, res: any) {
     return res.status(result.status).json(result.data);
   } catch (err: any) {
     console.error('[Vercel Serverless /api/judge] Unhandled exception:', err);
-    return res.status(500).json({ error: 'Lỗi máy chủ nội bộ trong quá trình xử lý chấm bài.' });
+    return res.status(500).json({ error: 'Không thể chấm bài lúc này. Vui lòng thử lại.' });
   }
 }
