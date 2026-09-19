@@ -12,6 +12,11 @@ import { ProblemDetail } from './ProblemDetail';
 import { ProblemListView } from './ProblemListView';
 import { Footer } from '../../components/Footer';
 import {
+  JUDGE_ENABLED_PROBLEMS,
+  isJudgeEnabled,
+  isValidJudgeProblem,
+} from './constants/judgeConfig';
+import {
   getGroupProblemStatuses,
   setGroupProblemStatus,
   getCodingStudentInfo,
@@ -134,6 +139,14 @@ export const CodingHome: React.FC<CodingHomeProps> = ({ onBackToHome }) => {
     newStatus: ProblemStatus,
     overrideStudentInfo?: CodingStudentInfo
   ) => {
+    // Validate problemId for september track against central judgeConfig
+    if (track === 'september' && !isValidJudgeProblem(problemId)) {
+      console.warn(
+        `[CodingHome] Cảnh báo: Bài ${problemId} không nằm trong danh sách Auto-Judge hợp lệ:`,
+        JUDGE_ENABLED_PROBLEMS
+      );
+    }
+
     const activeStudent = overrideStudentInfo || studentInfo;
     if (!activeStudent || !activeStudent.fullName.trim()) {
       setPendingStatusUpdate({ track, problemId, newStatus });
@@ -525,6 +538,15 @@ export const CodingHome: React.FC<CodingHomeProps> = ({ onBackToHome }) => {
                     Giao tiếp:{' '}
                     <strong className="font-semibold text-slate-900">
                       stdin / stdout
+                    </strong>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                  <span>
+                    Chấm tự động:{' '}
+                    <strong className="font-semibold text-slate-900">
+                      Toàn bộ {JUDGE_ENABLED_PROBLEMS.length} bài ({JUDGE_ENABLED_PROBLEMS[0]} - {JUDGE_ENABLED_PROBLEMS[JUDGE_ENABLED_PROBLEMS.length - 1]})
                     </strong>
                   </span>
                 </div>

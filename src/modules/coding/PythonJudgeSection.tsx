@@ -6,7 +6,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ProblemStatus } from '../../types';
 import { CodingStudentInfo } from '../../utils/codingStorage';
-import { isJudgeEnabled, JUDGE_ENABLED_PROBLEMS } from '../../config/judgeConfig';
+import { isJudgeEnabled, JUDGE_ENABLED_PROBLEMS } from './constants/judgeConfig';
 import {
   Play,
   Trash2,
@@ -191,7 +191,7 @@ export const PythonJudgeSection: React.FC<PythonJudgeSectionProps> = ({
     }
   };
 
-  // Render Coming Soon for B03-B33 (or non-supported problems)
+  // Render fallback for non-supported tracks or problems
   if (!isSupported) {
     return (
       <section className="bg-slate-50/80 border border-slate-200 rounded-2xl p-6 transition-all">
@@ -205,13 +205,9 @@ export const PythonJudgeSection: React.FC<PythonJudgeSectionProps> = ({
                 <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
                   Nộp bài Python
                 </h3>
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-200">
-                  <Clock className="w-3 h-3 text-amber-600" />
-                  Chấm tự động: Sắp mở
-                </span>
               </div>
               <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                Hệ thống chấm tự động hiện đang được kích hoạt cho các bài <strong>B01</strong> đến <strong>B10</strong>. Các bài tiếp theo (B11 - B33) sẽ được cập nhật bộ kiểm thử tự động trong thời gian tới.
+                Hệ thống chấm tự động hiện đang hỗ trợ toàn bộ 33 bài luyện thi (B01 đến B33) của track luyện thi tháng 9.
               </p>
             </div>
           </div>

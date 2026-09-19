@@ -12,7 +12,7 @@ import { basicCodingProblems } from '../../data/basicCodingProblems';
 import { septemberCodingProblems } from '../../data/septemberCodingProblems';
 import { TeacherStudentDetail } from './TeacherStudentDetail';
 import { SubmissionDetailModal } from './SubmissionDetailModal';
-import { JUDGE_ENABLED_PROBLEMS } from '../../config/judgeConfig';
+import { JUDGE_ENABLED_PROBLEMS } from '../coding/constants/judgeConfig';
 import { Footer } from '../../components/Footer';
 import {
   LayoutDashboard,
@@ -668,7 +668,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                           <th className="py-3.5 px-4">Cơ bản & Trung bình (33 bài)</th>
                           <th className="py-3.5 px-4">Luyện thi tháng 9 (33 bài)</th>
                           <th className="py-3.5 px-4 text-center">Tổng coding</th>
-                          <th className="py-3.5 px-4 text-center">Submissions (B01-B10)</th>
+                          <th className="py-3.5 px-4 text-center">Submissions (B01-B33)</th>
                           <th className="py-3.5 px-4 text-right">Hoạt động cuối</th>
                         </tr>
                       </thead>
@@ -1255,7 +1255,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                           <span>Danh Sách Lượt Nộp Bài Lập Trình</span>
                         </h2>
                         <p className="text-xs text-slate-400 mt-0.5">
-                          Dữ liệu chấm bài tự động qua Judge API (B01 - B10), hiển thị theo thời gian thực
+                          Dữ liệu chấm bài tự động qua Judge API (B01 - B33), hiển thị theo thời gian thực
                         </p>
                       </div>
 
@@ -1296,14 +1296,14 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({
                         ))}
                       </select>
 
-                      {/* Filter Problem B01-B10 */}
+                      {/* Filter Problem B01-B33 */}
                       <select
                         id="select-filter-sub-problem"
                         value={subProblemFilter}
                         onChange={(e) => setSubProblemFilter(e.target.value)}
                         className="px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-700 rounded-lg text-slate-200 focus:outline-hidden focus:ring-1 focus:ring-blue-500 cursor-pointer"
                       >
-                        <option value="all">Tất cả bài (B01 - B10)</option>
+                        <option value="all">Tất cả bài (B01 - B33)</option>
                         {(JUDGE_ENABLED_PROBLEMS as readonly string[]).map((pid) => {
                           const prob = septemberCodingProblems.find((p) => p.id === pid);
                           return (

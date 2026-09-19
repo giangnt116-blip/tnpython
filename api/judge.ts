@@ -1,25 +1,21 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
+import {
+  JUDGE_ENABLED_PROBLEMS,
+  JudgeEnabledProblemId,
+  isValidJudgeProblem,
+} from '../src/modules/coding/constants/judgeConfig';
 
 dotenv.config();
 
 /**
- * Danh sách 10 bài luyện thi tháng 9 đã mở hệ thống chấm tự động (Judge V1.1)
+ * Danh sách 33 bài luyện thi tháng 9 đã mở hệ thống chấm tự động (Judge V1.3: B01 - B33)
+ * Được đồng bộ hóa từ nguồn chân lý duy nhất trong src/modules/coding/constants/judgeConfig.ts
  */
-export const SUPPORTED_PROBLEMS = [
-  'B01',
-  'B02',
-  'B03',
-  'B04',
-  'B05',
-  'B06',
-  'B07',
-  'B08',
-  'B09',
-  'B10',
-] as const;
-
-export type SupportedProblemId = (typeof SUPPORTED_PROBLEMS)[number];
+export { JUDGE_ENABLED_PROBLEMS };
+export type { JudgeEnabledProblemId };
+export const SUPPORTED_PROBLEMS = JUDGE_ENABLED_PROBLEMS;
+export type SupportedProblemId = JudgeEnabledProblemId;
 
 export interface JudgeRequestBody {
   student_name: string;
@@ -110,9 +106,9 @@ export function validateJudgeRequest(body: any): string | null {
 
   if (
     typeof problem_id !== 'string' ||
-    !SUPPORTED_PROBLEMS.includes(problem_id as SupportedProblemId)
+    !isValidJudgeProblem(problem_id)
   ) {
-    return `Hệ thống hiện chỉ hỗ trợ chấm các bài: ${SUPPORTED_PROBLEMS.join(', ')}.`;
+    return `Hệ thống hiện chỉ hỗ trợ chấm các bài: ${JUDGE_ENABLED_PROBLEMS.join(', ')}.`;
   }
 
   if (typeof source_code !== 'string' || source_code.trim().length === 0) {
@@ -127,7 +123,7 @@ export function validateJudgeRequest(body: any): string | null {
 }
 
 /**
- * Executes the full grading workflow for supported problems (B01-B10) via Judge0 and logs to Supabase.
+ * Executes the full grading workflow for supported problems (B01-B20) via Judge0 and logs to Supabase.
  */
 export async function executeJudge(
   body: JudgeRequestBody

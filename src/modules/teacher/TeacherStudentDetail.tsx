@@ -4,7 +4,7 @@ import { SubmissionDetailModal } from './SubmissionDetailModal';
 import { Footer } from '../../components/Footer';
 import { basicCodingProblems } from '../../data/basicCodingProblems';
 import { septemberCodingProblems } from '../../data/septemberCodingProblems';
-import { JUDGE_ENABLED_PROBLEMS } from '../../config/judgeConfig';
+import { JUDGE_ENABLED_PROBLEMS } from '../coding/constants/judgeConfig';
 import {
   ArrowLeft,
   Award,
@@ -213,7 +213,7 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
       .sort((a, b) => new Date(b.submitted_at || 0).getTime() - new Date(a.submitted_at || 0).getTime());
   }, [codingSubmissions, studentName, className]);
 
-  // Statistics for Problem B01 - B10
+  // Statistics for Problem B01 - B33
   const problemSummaries = useMemo(() => {
     const problems = JUDGE_ENABLED_PROBLEMS as readonly string[];
     return problems.map((pid) => {
@@ -1074,10 +1074,10 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
               <div>
                 <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
                   <Terminal className="w-5 h-5 text-blue-400" />
-                  <span>Lịch Sử Bài Nộp Lập Trình (Judge B01 - B10)</span>
+                  <span>Lịch Sử Bài Nộp Lập Trình (Judge B01 - B33)</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-0.5">
-                  Chi tiết từng bài B01-B10 và lịch sử tất cả các lần nộp code của học sinh{' '}
+                  Chi tiết từng bài B01-B33 và lịch sử tất cả các lần nộp code của học sinh{' '}
                   <strong className="text-white">{studentName}</strong>
                 </p>
               </div>
@@ -1094,10 +1094,10 @@ export const TeacherStudentDetail: React.FC<TeacherStudentDetailProps> = ({
               </div>
             </div>
 
-            {/* Requirement 6: Chi tiết bài nộp theo bài (B01 - B10 Cards) */}
+            {/* Requirement 6: Chi tiết bài nộp theo bài (B01 - B33 Cards) */}
             <div className="pt-4">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-1.5">
-                <span>Trạng thái 10 bài đã mở Judge tự động (B01 - B10)</span>
+                <span>Trạng thái 33 bài đã mở Judge tự động (B01 - B33)</span>
               </h4>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
