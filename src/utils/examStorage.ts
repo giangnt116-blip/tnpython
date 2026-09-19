@@ -1,7 +1,10 @@
 import { SavedExamState, ExamResult } from '../types';
+import { ExamResultInput } from '../services/examResults';
 
 const STORAGE_KEY_EXAM = 'python_100_exam_state';
 const STORAGE_KEY_RESULT = 'python_100_exam_result';
+const STORAGE_KEY_SYNCED = 'python_100_result_synced';
+const STORAGE_KEY_PENDING_PAYLOAD = 'python_100_pending_supabase_payload';
 
 /**
  * Save in-progress exam state to localStorage
@@ -97,4 +100,63 @@ export function clearResult(): void {
 export function clearAllExamData(): void {
   clearExam();
   clearResult();
+  clearPendingPayload();
+  try {
+    localStorage.removeItem(STORAGE_KEY_SYNCED);
+  } catch {}
+}
+
+/**
+ * Check if the exam result has been successfully synced to Supabase
+ */
+export function isResultSynced(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY_SYNCED) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Set the exam result sync status in localStorage
+ */
+export function setResultSynced(synced: boolean): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_SYNCED, synced ? 'true' : 'false');
+  } catch (error) {
+    console.error('Failed to set resultSynced in localStorage:', error);
+  }
+}
+
+/**
+ * Save pending Supabase payload to localStorage when offline or sync fails
+ */
+export function savePendingPayload(payload: ExamResultInput): void {
+  try {
+    localStorage.setItem(STORAGE_KEY_PENDING_PAYLOAD, JSON.stringify(payload));
+  } catch (error) {
+    console.error('Failed to save pending payload:', error);
+  }
+}
+
+/**
+ * Load pending Supabase payload from localStorage
+ */
+export function loadPendingPayload(): ExamResultInput | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_PENDING_PAYLOAD);
+    if (!raw) return null;
+    return JSON.parse(raw) as ExamResultInput;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Clear pending Supabase payload from localStorage
+ */
+export function clearPendingPayload(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY_PENDING_PAYLOAD);
+  } catch {}
 }

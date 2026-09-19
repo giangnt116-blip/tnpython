@@ -13,6 +13,9 @@ import { QuestionNavigator } from './components/QuestionNavigator';
 import { SubmitConfirmModal } from './components/SubmitConfirmModal';
 import { ResultScreen } from './components/ResultScreen';
 import { ResumeExamModal } from './components/ResumeExamModal';
+import { HomeScreen } from './components/HomeScreen';
+import { CodingHome } from './modules/coding/CodingHome';
+import { TeacherModule } from './modules/teacher/TeacherModule';
 import {
   saveExam,
   loadExam,
@@ -20,7 +23,13 @@ import {
   saveResult,
   loadResult,
   clearAllExamData,
+  isResultSynced,
+  setResultSynced,
+  savePendingPayload,
+  loadPendingPayload,
+  clearPendingPayload,
 } from './utils/examStorage';
+import { saveExamResult, ExamResultInput } from './services/examResults';
 
 const TOTAL_EXAM_MINUTES = 100;
 const TOTAL_EXAM_SECONDS = TOTAL_EXAM_MINUTES * 60; // 6000 seconds
@@ -54,6 +63,47 @@ export default function App() {
     return loadResult();
   });
 
+  const [mainModule, setMainModule] = useState<'home' | 'quiz' | 'coding' | 'teacher'>(() => {
+    if (
+      typeof window !== 'undefined' &&
+      (window.location.pathname.startsWith('/teacher') || window.location.hash === '#teacher')
+    ) {
+      return 'teacher';
+    }
+    return 'home';
+  });
+
+  // Keep URL in sync with teacher portal
+  useEffect(() => {
+    const handlePopState = () => {
+      if (
+        window.location.pathname.startsWith('/teacher') ||
+        window.location.hash === '#teacher'
+      ) {
+        setMainModule('teacher');
+      } else if (mainModule === 'teacher') {
+        setMainModule('home');
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [mainModule]);
+
+  const handleNavigateTeacher = () => {
+    if (typeof window !== 'undefined' && window.location.pathname !== '/teacher') {
+      window.history.pushState(null, '', '/teacher');
+    }
+    setMainModule('teacher');
+  };
+
+  const handleNavigateHomeFromTeacher = () => {
+    if (typeof window !== 'undefined' && window.location.pathname === '/teacher') {
+      window.history.pushState(null, '', '/');
+    }
+    setMainModule('home');
+  };
+
   const [screen, setScreen] = useState<'start' | 'exam' | 'result'>(() => {
     if (loadResult()) return 'result';
     return 'start';
@@ -69,6 +119,50 @@ export default function App() {
 
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState<boolean>(false);
   const [isOpenMobileNavigator, setIsOpenMobileNavigator] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const isSubmittingRef = useRef<boolean>(false);
+  const [isSynced, setIsSynced] = useState<boolean>(() => {
+    return isResultSynced();
+  });
+
+  const retryAttemptedRef = useRef<boolean>(false);
+
+  // Retry sync if result was saved locally but not yet synced to Supabase
+  useEffect(() => {
+    if (isResultSynced()) {
+      setIsSynced(true);
+      return;
+    }
+
+    const pendingPayload = loadPendingPayload();
+    if (!pendingPayload) return;
+
+    if (retryAttemptedRef.current) return;
+    retryAttemptedRef.current = true;
+
+    const performRetry = async () => {
+      try {
+        await saveExamResult(pendingPayload);
+        setResultSynced(true);
+        clearPendingPayload();
+        setIsSynced(true);
+        console.log('Đã tự động đồng bộ kết quả thi lên Supabase thành công.');
+      } catch (err) {
+        console.warn('Tự động đồng bộ lại lên Supabase chưa thành công:', err);
+      }
+    };
+
+    if (navigator.onLine) {
+      performRetry();
+    } else {
+      const handleOnline = () => {
+        performRetry();
+        window.removeEventListener('online', handleOnline);
+      };
+      window.addEventListener('online', handleOnline);
+      return () => window.removeEventListener('online', handleOnline);
+    }
+  }, []);
 
   // Refs for callbacks & intervals
   const answersRef = useRef(answers);
@@ -141,30 +235,113 @@ export default function App() {
   }, []);
 
   // Submit exam logic
-  const handleSubmitExam = useCallback((remainingSeconds?: number) => {
-    const sec =
-      remainingSeconds !== undefined
-        ? remainingSeconds
-        : endTimeRef.current
-        ? Math.max(0, Math.floor((endTimeRef.current - Date.now()) / 1000))
-        : timeLeftSeconds;
+  const handleSubmitExam = useCallback(
+    async (
+      remainingSeconds?: number,
+      forcedAnswers?: Record<number, string>,
+      forcedStudent?: StudentInfo,
+      forcedStartTime?: number
+    ) => {
+      // Prevent multiple submissions
+      if (isSubmittingRef.current) return;
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
 
-    const finalResult = gradeExam(
-      answersRef.current,
-      sec,
-      studentRef.current || undefined,
-      startTimeRef.current
-    );
+      const curAnswers = forcedAnswers || answersRef.current;
+      const curStudent = forcedStudent || studentRef.current || { fullName: 'Học sinh', className: '' };
+      const curStartTime = forcedStartTime !== undefined ? forcedStartTime : startTimeRef.current;
 
-    // Save result to localStorage and clear exam progress
-    saveResult(finalResult);
-    clearExam();
+      // 1. Chấm điểm
+      const sec =
+        remainingSeconds !== undefined
+          ? remainingSeconds
+          : endTimeRef.current
+          ? Math.max(0, Math.floor((endTimeRef.current - Date.now()) / 1000))
+          : timeLeftSeconds;
 
-    setResult(finalResult);
-    setIsConfirmModalOpen(false);
-    setIsOpenMobileNavigator(false);
-    setScreen('result');
-  }, [gradeExam, timeLeftSeconds]);
+      const finalResult = gradeExam(
+        curAnswers,
+        sec,
+        curStudent,
+        curStartTime
+      );
+
+      // 2. Tính: score, correct_count, wrong_count, blank_count, duration_seconds
+      const score = finalResult.score;
+      const correct_count = finalResult.correctCount;
+      const wrong_count = finalResult.incorrectCount;
+      const blank_count = finalResult.unansweredCount;
+      const duration_seconds = finalResult.timeSpentSeconds;
+
+      // 3. Tính điểm 10 chủ đề (dựa trên field category của questions.js theo đúng thứ tự)
+      const topic_1_score = finalResult.categoryScores[0]?.correct ?? 0;
+      const topic_2_score = finalResult.categoryScores[1]?.correct ?? 0;
+      const topic_3_score = finalResult.categoryScores[2]?.correct ?? 0;
+      const topic_4_score = finalResult.categoryScores[3]?.correct ?? 0;
+      const topic_5_score = finalResult.categoryScores[4]?.correct ?? 0;
+      const topic_6_score = finalResult.categoryScores[5]?.correct ?? 0;
+      const topic_7_score = finalResult.categoryScores[6]?.correct ?? 0;
+      const topic_8_score = finalResult.categoryScores[7]?.correct ?? 0;
+      const topic_9_score = finalResult.categoryScores[8]?.correct ?? 0;
+      const topic_10_score = finalResult.categoryScores[9]?.correct ?? 0;
+
+      // 4. Chuẩn bị answers_json (lựa chọn của học sinh dạng { "1": "B", ..., "100": null }, không lưu đáp án đúng)
+      const answers_json: Record<string, string | null> = {};
+      for (let i = 1; i <= 100; i++) {
+        answers_json[String(i)] = curAnswers[i] || null;
+      }
+
+      const supabasePayload: ExamResultInput = {
+        student_name: finalResult.student.fullName,
+        class_name: finalResult.student.className ? finalResult.student.className : null,
+        score,
+        correct_count,
+        wrong_count,
+        blank_count,
+        duration_seconds,
+        topic_1_score,
+        topic_2_score,
+        topic_3_score,
+        topic_4_score,
+        topic_5_score,
+        topic_6_score,
+        topic_7_score,
+        topic_8_score,
+        topic_9_score,
+        topic_10_score,
+        answers_json,
+        exam_version: 'python100-v1',
+      };
+
+      // Luôn lưu toàn bộ kết quả vào localStorage và xóa dữ liệu làm dở
+      saveResult(finalResult);
+      clearExam();
+
+      // 5. Gọi saveExamResult()
+      let syncSuccess = false;
+      try {
+        await saveExamResult(supabasePayload);
+        syncSuccess = true;
+        setResultSynced(true);
+        clearPendingPayload();
+      } catch (error) {
+        console.warn('Supabase saveExamResult error (fallback to local):', error);
+        syncSuccess = false;
+        setResultSynced(false);
+        savePendingPayload(supabasePayload);
+      }
+
+      // 6. Sau đó chuyển sang ResultScreen
+      setResult(finalResult);
+      setIsSynced(syncSuccess);
+      setIsConfirmModalOpen(false);
+      setIsOpenMobileNavigator(false);
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
+      setScreen('result');
+    },
+    [gradeExam, timeLeftSeconds]
+  );
 
   // Persistent Timer: Calculates from absolute endTime
   useEffect(() => {
@@ -240,17 +417,13 @@ export default function App() {
 
     // If time already expired while student was away, grade and submit immediately
     if (remaining <= 0) {
-      const finalResult = gradeExam(
-        uncompletedExam.answers || {},
+      handleSubmitExam(
         0,
+        uncompletedExam.answers || {},
         uncompletedExam.student,
         uncompletedExam.startTime
       );
-      saveResult(finalResult);
-      clearExam();
-      setResult(finalResult);
       setUncompletedExam(null);
-      setScreen('result');
       return;
     }
 
@@ -284,6 +457,7 @@ export default function App() {
     setEndTime(0);
     setTimeLeftSeconds(TOTAL_EXAM_SECONDS);
     setResult(null);
+    setIsSynced(false);
     setUncompletedExam(null);
     setScreen('start');
   };
@@ -316,6 +490,29 @@ export default function App() {
     setCurrentIndex((prev) => Math.min(questions.length - 1, prev + 1));
   };
 
+  // 1. Home Screen (First screen of the application)
+  if (mainModule === 'home') {
+    return (
+      <HomeScreen
+        onSelectQuiz={() => setMainModule('quiz')}
+        onSelectCoding={() => setMainModule('coding')}
+        onSelectTeacher={handleNavigateTeacher}
+        hasUncompletedExam={!!uncompletedExam}
+      />
+    );
+  }
+
+  // 2. Teacher Portal Module
+  if (mainModule === 'teacher') {
+    return <TeacherModule onBackToHome={handleNavigateHomeFromTeacher} />;
+  }
+
+  // 3. Coding Practice Module
+  if (mainModule === 'coding') {
+    return <CodingHome onBackToHome={() => setMainModule('home')} />;
+  }
+
+  // 3. Quiz Module (Existing logic preserved 100%)
   // Modal 1: Detect uncompleted exam
   if (uncompletedExam) {
     return (
@@ -330,12 +527,12 @@ export default function App() {
 
   // Render 1: Start Screen
   if (screen === 'start') {
-    return <StartScreen onStart={handleStartExam} />;
+    return <StartScreen onStart={handleStartExam} onBack={() => setMainModule('home')} />;
   }
 
   // Render 3: Result Screen
   if (screen === 'result' && result) {
-    return <ResultScreen result={result} onRestart={handleRestart} />;
+    return <ResultScreen result={result} isSynced={isSynced} onRestart={handleRestart} />;
   }
 
   // Render 2: Exam Screen
@@ -353,6 +550,7 @@ export default function App() {
         totalQuestions={questions.length}
         answeredCount={answeredCount}
         timeLeftSeconds={timeLeftSeconds}
+        isSubmitting={isSubmitting}
         onOpenNavigator={() => setIsOpenMobileNavigator(true)}
         onRequestSubmit={() => setIsConfirmModalOpen(true)}
       />
@@ -394,6 +592,7 @@ export default function App() {
         unansweredCount={unansweredCount}
         flaggedCount={flaggedQuestionIds.length}
         timeLeftSeconds={timeLeftSeconds}
+        isSubmitting={isSubmitting}
         onCancel={() => setIsConfirmModalOpen(false)}
         onConfirm={() => handleSubmitExam()}
       />

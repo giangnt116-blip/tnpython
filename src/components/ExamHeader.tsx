@@ -1,6 +1,6 @@
 import React from 'react';
 import { StudentInfo } from '../types';
-import { Clock, User, Send, LayoutGrid, AlertTriangle } from 'lucide-react';
+import { Clock, User, Send, LayoutGrid, AlertTriangle, Loader2 } from 'lucide-react';
 
 interface ExamHeaderProps {
   student: StudentInfo;
@@ -8,6 +8,7 @@ interface ExamHeaderProps {
   totalQuestions: number;
   answeredCount: number;
   timeLeftSeconds: number;
+  isSubmitting?: boolean;
   onOpenNavigator: () => void;
   onRequestSubmit: () => void;
 }
@@ -18,6 +19,7 @@ export const ExamHeader: React.FC<ExamHeaderProps> = ({
   totalQuestions,
   answeredCount,
   timeLeftSeconds,
+  isSubmitting = false,
   onOpenNavigator,
   onRequestSubmit,
 }) => {
@@ -94,11 +96,18 @@ export const ExamHeader: React.FC<ExamHeaderProps> = ({
               id="btn-header-submit-exam"
               type="button"
               onClick={onRequestSubmit}
-              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1.5 text-xs sm:text-sm font-bold text-white bg-rose-600 hover:bg-rose-500 active:bg-rose-700 rounded-xl shadow-xs transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-hidden"
+              disabled={isSubmitting}
+              className="inline-flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-4 py-1.5 text-xs sm:text-sm font-bold text-white bg-rose-600 hover:bg-rose-500 active:bg-rose-700 rounded-xl shadow-xs transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-hidden disabled:opacity-75 disabled:cursor-not-allowed"
               title="Xác nhận nộp bài thi"
             >
-              <Send className="w-3.5 h-3.5 shrink-0" />
-              <span className="tracking-wide">NỘP BÀI</span>
+              {isSubmitting ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+              ) : (
+                <Send className="w-3.5 h-3.5 shrink-0" />
+              )}
+              <span className="tracking-wide">
+                {isSubmitting ? 'ĐANG LƯU...' : 'NỘP BÀI'}
+              </span>
             </button>
           </div>
         </div>

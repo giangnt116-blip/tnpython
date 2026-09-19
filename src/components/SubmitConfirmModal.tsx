@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertCircle, Clock, CheckCircle2, HelpCircle, CheckCheck } from 'lucide-react';
+import { AlertCircle, Clock, CheckCircle2, HelpCircle, CheckCheck, Loader2 } from 'lucide-react';
 
 interface SubmitConfirmModalProps {
   isOpen: boolean;
@@ -8,6 +8,7 @@ interface SubmitConfirmModalProps {
   unansweredCount: number;
   flaggedCount: number;
   timeLeftSeconds: number;
+  isSubmitting?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }
@@ -19,6 +20,7 @@ export const SubmitConfirmModal: React.FC<SubmitConfirmModalProps> = ({
   unansweredCount,
   flaggedCount,
   timeLeftSeconds,
+  isSubmitting = false,
   onCancel,
   onConfirm,
 }) => {
@@ -40,7 +42,7 @@ export const SubmitConfirmModal: React.FC<SubmitConfirmModalProps> = ({
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-slate-900/70 backdrop-blur-xs transition-opacity"
-        onClick={onCancel}
+        onClick={isSubmitting ? undefined : onCancel}
       />
 
       {/* Modal Dialog */}
@@ -139,7 +141,8 @@ export const SubmitConfirmModal: React.FC<SubmitConfirmModalProps> = ({
             id="btn-cancel-submit"
             type="button"
             onClick={onCancel}
-            className="px-4 py-2.5 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-xl transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-hidden"
+            disabled={isSubmitting}
+            className="px-4 py-2.5 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 rounded-xl transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:outline-hidden disabled:opacity-50 disabled:cursor-not-allowed"
           >
             QUAY LẠI
           </button>
@@ -147,9 +150,17 @@ export const SubmitConfirmModal: React.FC<SubmitConfirmModalProps> = ({
             id="btn-confirm-submit"
             type="button"
             onClick={onConfirm}
-            className="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-500 active:bg-rose-700 rounded-xl shadow-xs transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-hidden"
+            disabled={isSubmitting}
+            className="px-5 py-2.5 text-sm font-bold text-white bg-rose-600 hover:bg-rose-500 active:bg-rose-700 rounded-xl shadow-xs transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-rose-400 focus-visible:outline-hidden disabled:opacity-75 disabled:cursor-not-allowed flex items-center gap-2"
           >
-            NỘP BÀI
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Đang lưu kết quả...</span>
+              </>
+            ) : (
+              <span>NỘP BÀI</span>
+            )}
           </button>
         </div>
       </div>

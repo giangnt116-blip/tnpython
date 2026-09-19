@@ -4,9 +4,10 @@ import { Award, Clock, FileQuestion, User, Users, ArrowRight } from 'lucide-reac
 
 interface StartScreenProps {
   onStart: (student: StudentInfo) => void;
+  onBack?: () => void;
 }
 
-export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
+export const StartScreen: React.FC<StartScreenProps> = ({ onStart, onBack }) => {
   const [fullName, setFullName] = useState('');
   const [className, setClassName] = useState('');
   const [touched, setTouched] = useState(false);
@@ -26,7 +27,16 @@ export const StartScreen: React.FC<StartScreenProps> = ({ onStart }) => {
   const isNameEmpty = touched && !fullName.trim();
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4 sm:p-6">
+    <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-4 sm:p-6 relative">
+      {onBack && (
+        <button
+          id="btn-back-home"
+          onClick={onBack}
+          className="absolute top-4 left-4 sm:top-6 sm:left-6 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700 transition-colors cursor-pointer"
+        >
+          <span>← Màn hình chính</span>
+        </button>
+      )}
       <div className="w-full max-w-lg bg-slate-800/90 border border-slate-700/80 rounded-2xl p-6 sm:p-8 shadow-2xl backdrop-blur-xs">
         {/* Header */}
         <div className="text-center space-y-2 mb-8">

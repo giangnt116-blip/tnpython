@@ -15,10 +15,11 @@ import {
 
 interface ResultScreenProps {
   result: ExamResult;
+  isSynced?: boolean;
   onRestart: () => void;
 }
 
-export const ResultScreen: React.FC<ResultScreenProps> = ({ result, onRestart }) => {
+export const ResultScreen: React.FC<ResultScreenProps> = ({ result, isSynced = true, onRestart }) => {
   const [showConfirmRestart, setShowConfirmRestart] = useState(false);
 
   const formatTimeSpent = (totalSec: number) => {
@@ -77,6 +78,14 @@ export const ResultScreen: React.FC<ResultScreenProps> = ({ result, onRestart })
           <p className="text-xs sm:text-sm text-slate-400">
             PYTHON 100 CHALLENGE • Đã hoàn thành và nộp bài
           </p>
+
+          {/* Sync notification if not yet synced */}
+          {!isSynced && (
+            <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 text-center flex items-center justify-center gap-2">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+              <span>Kết quả đã được lưu tạm trên thiết bị và chưa đồng bộ lên hệ thống.</span>
+            </div>
+          )}
         </div>
 
         {/* Candidate Info Card */}

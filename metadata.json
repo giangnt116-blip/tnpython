@@ -1,6 +1,6 @@
 {
   "name": "PYTHON 100 CHALLENGE",
-  "description": "Kiểm tra kiến thức Python cơ bản - 100 câu hỏi • 100 phút • 100 điểm",
+  "description": "Kiểm tra kiến thức Python 100 câu hỏi, luyện tập lập trình thuật toán và bảng điều khiển giáo viên",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
